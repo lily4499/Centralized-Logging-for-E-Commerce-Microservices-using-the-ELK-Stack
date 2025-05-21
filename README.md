@@ -215,7 +215,7 @@ output.logstash:
 {"timestamp":"2025-05-20T10:00:06Z","level":"warn","service":"order-service","message":"Payment service delayed","status":202}
 {"timestamp":"2025-05-20T10:00:07Z","level":"error","service":"order-service","message":"Failed to reserve stock","status":500}
 {"timestamp":"2025-05-20T10:00:09Z","level":"info","service":"order-service","message":"Order 125 created","status":201}
-
+```
 
 ---
 
