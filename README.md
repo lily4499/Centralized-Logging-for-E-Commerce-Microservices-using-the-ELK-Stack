@@ -338,7 +338,7 @@ You now have:
 
 ---
 ---
-To send your log files (`access.log`, `app.log`) to **Elasticsearch** via **Filebeat → Logstash → Elasticsearch**, follow this step-by-step guide.
+# To send your log files (`access.log`, `app.log`) to **Elasticsearch** via **Filebeat → Logstash → Elasticsearch**, follow this step-by-step guide.
 
 ---
 
