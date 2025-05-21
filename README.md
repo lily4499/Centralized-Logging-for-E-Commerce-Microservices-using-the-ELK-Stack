@@ -49,7 +49,7 @@ elk-ecommerce-logs/
 📄 `docker-compose.yml`
 
 ```yaml
-version: '3'
+
 services:
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:7.17.9
@@ -60,10 +60,14 @@ services:
 
   logstash:
     image: docker.elastic.co/logstash/logstash:7.17.9
-    volumes:
+    volumes:  # Mount Log Files into Logstash Container
       - ./logstash/logstash.conf:/usr/share/logstash/pipeline/logstash.conf
+      - ./nginx-service:/usr/share/logstash/pipeline/nginx-service
+      - ./product-service:/usr/share/logstash/pipeline/product-service
+      - ./order-service:/usr/share/logstash/pipeline/order-service
     ports:
       - "5000:5000"
+#This ensures Logstash can read your files inside the container.
 
   kibana:
     image: docker.elastic.co/kibana/kibana:7.17.9
@@ -74,6 +78,10 @@ services:
 ```bash
 sudo apt  install docker-compose
 docker-compose up -d
+# watch the logs
+docker logs -f elk-ecommerce-logs_logstash_1
+
+docker-compose down
 ```
 
 ---
@@ -86,6 +94,9 @@ docker-compose up -d
 
 ```bash
 curl http://localhost:9200
+#Check Data in Elasticsearch
+curl http://localhost:9200/_cat/indices?v
+
 ```
 
 Returns cluster metadata confirming Elasticsearch is live.
@@ -100,15 +111,43 @@ Returns cluster metadata confirming Elasticsearch is live.
 
 ```conf
 input {
-  tcp {
-    port => 5000
-    codec => json_lines
+  file {
+    path => "/usr/share/logstash/pipeline/nginx-service/logs/access.log"
+    start_position => "beginning"
+    sincedb_path => "/dev/null"
+    codec => plain
+    type => "nginx"
+  }
+
+  file {
+    path => "/usr/share/logstash/pipeline/product-service/app.log"
+    start_position => "beginning"
+    sincedb_path => "/dev/null"
+    codec => json
+    type => "product"
+  }
+
+  file {
+    path => "/usr/share/logstash/pipeline/order-service/app.log"
+    start_position => "beginning"
+    sincedb_path => "/dev/null"
+    codec => json
+    type => "order"
   }
 }
 
 filter {
-  grok {
-    match => { "message" => "%{COMBINEDAPACHELOG}" }
+  if [type] == "nginx" {
+    grok {
+      match => { "message" => "%{COMBINEDAPACHELOG}" }
+    }
+    mutate {
+      add_field => { "log_type" => "nginx-access" }
+    }
+  } else if [type] == "product" or [type] == "order" {
+    mutate {
+      add_field => { "log_type" => "json-app-log" }
+    }
   }
 }
 
@@ -118,6 +157,7 @@ output {
     index => "ecommerce-logs-%{+YYYY.MM.dd}"
   }
 }
+
 ```
 
 This config listens on port `5000` for logs, parses them using **Grok**, and sends them to **Elasticsearch**.
@@ -176,14 +216,7 @@ output.logstash:
 {"timestamp":"2025-05-20T10:00:06Z","level":"warn","service":"order-service","message":"Payment service delayed","status":202}
 {"timestamp":"2025-05-20T10:00:07Z","level":"error","service":"order-service","message":"Failed to reserve stock","status":500}
 {"timestamp":"2025-05-20T10:00:09Z","level":"info","service":"order-service","message":"Order 125 created","status":201}
-```
 
-Simulate sending logs:
-
-```bash
-cat nginx-service/logs/access.log | nc localhost 5000
-cat product-service/app.log | nc localhost 5000
-```
 
 ---
 
@@ -195,6 +228,7 @@ cat product-service/app.log | nc localhost 5000
 * Go to **Discover**
 * Select index pattern: `ecommerce-logs-*`
 * Analyze logs: Search for 404 errors, slow requests, etc.
+* View logs from NGINX, product-service, and order-service
 
 Example query:
 
