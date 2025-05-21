@@ -77,12 +77,13 @@ services:
 
 ```bash
 sudo apt  install docker-compose
+docker-compose down
+
 docker-compose up -d
 # watch the logs
 docker logs -f elk-ecommerce-logs_logstash_1
-
-docker-compose down
 ```
+![image](https://github.com/user-attachments/assets/f7fc966d-6cf0-4e08-993f-3ec969317734)
 
 ---
 
@@ -95,11 +96,18 @@ docker-compose down
 ```bash
 curl http://localhost:9200
 ```
+![image](https://github.com/user-attachments/assets/e3d2d291-4877-4fa1-a7de-0ab4e2c63a17)
+
 Returns cluster metadata confirming Elasticsearch is live.
+![image](https://github.com/user-attachments/assets/7ea036db-51ab-49d6-9d19-354b79423beb)
+
+
 ### Check Data in Elasticsearch
 ```
 curl http://localhost:9200/_cat/indices?v
 ```
+![image](https://github.com/user-attachments/assets/39520ed2-7499-4c9e-82d8-2a14542af338)
+
 ---
 
 ### **Step 3: Understand and Configure Logstash**
@@ -141,14 +149,28 @@ filter {
       match => { "message" => "%{COMBINEDAPACHELOG}" }
     }
     mutate {
-      add_field => { "log_type" => "nginx-access" }
+      add_field => {
+        "log_type" => "nginx-access"
+        "service"  => "nginx"
+      }
     }
-  } else if [type] == "product" or [type] == "order" {
+  } else if [type] == "product" {
     mutate {
-      add_field => { "log_type" => "json-app-log" }
+      add_field => {
+        "log_type" => "json-app-log"
+        "service"  => "product-service"
+      }
+    }
+  } else if [type] == "order" {
+    mutate {
+      add_field => {
+        "log_type" => "json-app-log"
+        "service"  => "order-service"
+      }
     }
   }
 }
+
 
 output {
   elasticsearch {
@@ -169,16 +191,6 @@ This config listens on port `5000` for logs, parses them using **Grok**, and sen
 
 Use if your microservices are not sending logs directly.
 
-```bash
-filebeat.yml
-filebeat.inputs:
-- type: log
-  paths:
-    - /var/log/nginx/*.log
-
-output.logstash:
-  hosts: ["localhost:5000"]
-```
 
 ---
 
@@ -223,31 +235,293 @@ output.logstash:
 
 **Concept**: Kibana visualizes logs from Elasticsearch.
 
-* Open: [http://localhost:5601](http://localhost:5601)
-* Go to **Discover**
-* Select index pattern: `ecommerce-logs-*`
-* Analyze logs: Search for 404 errors, slow requests, etc.
-* View logs from NGINX, product-service, and order-service
-Filter by service: nginx, product-service, or order-service
-
-
-Example query:
-
-```
-status: 500
-```
+Here’s a **complete step-by-step guide** to play around with your logs using **Kibana’s Discover tab**, once your logs are flowing into **Elasticsearch** via Filebeat + Logstash.
 
 ---
+
+## 🔍 Step-by-Step: Analyze Logs in Kibana
+
+### ✅ Step 1: Open Kibana
+
+In your browser, go to:
+
+```
+http://localhost:5601
+```
+
+If you're running Docker in WSL or a remote host, replace `localhost` with the appropriate IP.
+
+---
+
+### ✅ Step 2: Create an Index Pattern
+
+1. Click on **“Stack Management”** (⚙️ gear icon in the sidebar)
+
+2. Under **“Kibana” → “Data Views”**, click **Create data view**
+
+3. Enter this as the pattern:
+
+   ```
+   ecommerce-logs-*
+   ```
+
+4. For **timestamp field**, choose:
+
+   ```
+   @timestamp
+   ```
+
+   (If missing, select `timestamp` or skip timestamp selection)
+
+5. Click **Create data view**
+![image](https://github.com/user-attachments/assets/cbf968ed-cddf-4be6-92c0-4442cf687989)
+
+---
+
+### ✅ Step 3: Go to Discover
+
+1. Click the **“Discover”** tab in the left sidebar.
+2. In the top-left dropdown, select:
+
+   ```
+   ecommerce-logs-*
+   ```
+3. You’ll now see logs ingested from:
+
+   * `nginx-service`
+   * `product-service`
+   * `order-service`
+![image](https://github.com/user-attachments/assets/0dad95b7-45c5-4aee-8f1c-d0f40f1cdd8d)
+
+
+---
+
+### ✅ Step 4: Explore Logs by Service
+
+To filter logs by service:
+
+#### 🟢 NGINX logs:
+
+```
+service: "nginx"
+```
+
+#### 🟡 Product logs:
+
+```
+service: "product-service"
+```
+
+#### 🔵 Order logs:
+
+```
+service: "order-service"
+```
+
+⏩ You can also add filters by clicking the **field name** (e.g., `service`) in the left panel, then clicking a value like `nginx`.
+![image](https://github.com/user-attachments/assets/390743d8-b03e-45a2-aba6-a30d84625829)
+
+---
+
+### ✅ Step 5: Search Specific Patterns
+
+In the top search bar:
+
+| What You Want to Find                | Example Query                            |
+| ------------------------------------ | ---------------------------------------- |
+| All 404 errors                       | `status:404`                             |
+| All 500 server errors                | `status:500`                             |
+| Logs from product-service only       | `service:"product-service"`              |
+| 500 errors from order service        | `service:"order-service" AND status:500` |
+| Logs containing “timeout”            | `message:*timeout*`                      |
+| Logs with slow responses (if parsed) | `response_time_ms:[1000 TO *]`           |
+
+![image](https://github.com/user-attachments/assets/5f9c2506-3d57-44a7-8b3c-5385a29f1557)
+
+---
+
+### ✅ Step 6: Adjust Time Range
+
+In the top-right corner:
+
+* Click the **time filter** (e.g., “Last 15 minutes”)
+* Select a broader range like:
+
+  * “Last 1 hour”
+  * “Last 24 hours”
+  * “Today”
+
+This helps ensure logs are visible depending on your ingestion timing.
+
+---
+
+### ✅ Step 7: Customize Table Columns
+
+1. In the left sidebar (Fields), click the **➕ icon** next to fields you want to display:
+
+   * `service`
+   * `status`
+   * `message`
+   * `timestamp`
+   * `clientip` (from nginx logs)
+2. They will appear in your results table for easier analysis.
+![image](https://github.com/user-attachments/assets/1abf4b58-b032-451c-b218-7eee9c10e63b)
+
+---
+
+### ✅ Step 8: Save Your View (Optional)
+
+* Click the **Save** icon at the top
+* Give your search a name like:
+
+  ```
+  All 500 Errors by Service
+  ```
+
+You can now reuse it any time.
+![image](https://github.com/user-attachments/assets/1ab594c0-6672-4f6a-9bfb-37bfd331b530)
+
+---
+
 
 ### **Step 7: Create Dashboards in Kibana**
 
 **Concept**: Visual dashboards help monitor service health and patterns.
 
-Create:
+ **create a Kibana dashboard** that visually summarizes your logs from NGINX, product-service, and order-service.
 
-* Pie chart: `status` code distribution
-* Line chart: `response time` trends
-* Data table: Top URLs by hits
+---
+
+## 📊 Step-by-Step: Build a Dashboard in Kibana
+
+### ✅ Step 1: Open the Dashboard Section
+
+1. In Kibana, go to **Dashboard** (📊 icon in the sidebar)
+2. Click **Create Dashboard**
+3. Click **“+ Create new visualization”**
+
+---
+
+## 🔧 Now create these useful visualizations:
+
+---
+
+### 📌 1. **Pie Chart: Errors by Service**
+
+> Shows how many `500` or `404` errors each service produces.
+
+1. Select **Pie**
+2. Data view: `ecommerce-logs-*`
+3. **Filter (optional):**
+
+   ```kql
+   status: (404 or 500)
+   ```
+4. **Buckets:**
+
+   * Aggregation: Terms
+   * Field: `service.keyword`
+5. Click **Save** → Name: `Errors by Service`
+6. 
+![image](https://github.com/user-attachments/assets/f34caaa6-746f-4e90-98d8-f50c495328b9)
+
+---
+
+### 📌 2. **Bar Chart: Top Requested URLs (NGINX)**
+
+> See the most frequently accessed endpoints.
+
+1. Visualization type: **Bar**
+2. Data view: `ecommerce-logs-*`
+3. **Filter (optional):**
+
+   ```kql
+   service: "nginx"
+   ```
+4. **X-axis:**
+
+   * Aggregation: Terms
+   * Field: `request.keyword`
+5. **Y-axis:**
+
+   * Aggregation: Count
+6. Click **Save** → Name: `Top NGINX URLs`
+
+---
+
+### 📌 3. **Line Chart: 500 Errors Over Time**
+
+1. Type: **Line**
+2. Filter:
+
+   ```kql
+   status: 500
+   ```
+3. **X-axis:**
+
+   * Date Histogram on `@timestamp`
+4. **Y-axis:**
+
+   * Count
+5. Split Series (optional): `service.keyword`
+6. Save as `500 Errors Over Time`
+7. 
+![image](https://github.com/user-attachments/assets/83f3781e-40eb-4e05-884b-7dd7ba65bacf)
+
+---
+
+### 📌 4. **Metric: Total Logs Ingested**
+
+1. Type: **Metric**
+2. Aggregation: `Count`
+3. Save as: `Total Logs`
+
+---
+
+### 📌 5. **Data Table: Recent 404/500 Errors**
+
+1. Type: **Data Table**
+2. Filter:
+
+   ```kql
+   status: (404 or 500)
+   ```
+3. Columns:
+
+   * `@timestamp`
+   * `service`
+   * `status`
+   * `message` (or `request`)
+4. Save as: `Recent Errors Table`
+
+---
+
+### ✅ Step 2: Add Visualizations to Dashboard
+
+1. Go back to your dashboard
+2. Click **Add from library**
+3. Select all saved visualizations (e.g., `Errors by Service`, `Top URLs`, etc.)
+4. Drag and resize as needed
+5. Click **Save Dashboard** — name it something like:
+
+   ```
+   E-Commerce Log Dashboard
+   ```
+
+---
+
+### 🧪 Final Touch: Filter by service or time
+
+* Use the filter bar at the top:
+
+  * `service: "product-service"`
+  * `status: 500`
+* Change the time range (top-right) to match log activity.
+
+---
+
+Would you like me to generate Kibana `.ndjson` export files so you can import these prebuilt visualizations and dashboard instantly?
+
 
 ---
 
