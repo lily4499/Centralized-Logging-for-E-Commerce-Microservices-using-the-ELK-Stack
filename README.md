@@ -94,13 +94,12 @@ docker-compose down
 
 ```bash
 curl http://localhost:9200
-#Check Data in Elasticsearch
-curl http://localhost:9200/_cat/indices?v
-
 ```
-
 Returns cluster metadata confirming Elasticsearch is live.
-
+### Check Data in Elasticsearch
+```
+curl http://localhost:9200/_cat/indices?v
+```
 ---
 
 ### **Step 3: Understand and Configure Logstash**
@@ -229,6 +228,8 @@ output.logstash:
 * Select index pattern: `ecommerce-logs-*`
 * Analyze logs: Search for 404 errors, slow requests, etc.
 * View logs from NGINX, product-service, and order-service
+Filter by service: nginx, product-service, or order-service
+
 
 Example query:
 
@@ -283,11 +284,20 @@ You now have:
 
 ---
 
-## 🏁 Next Steps
 
-* 📦 Add Log Rotation with `logrotate`
-* 🔐 Secure ELK with user authentication (Elastic Stack Security)
-* ☁️ Deploy ELK on Kubernetes or AWS ECS
+## ✅ Enhanced ELK Workflow Summary (by Infrastructure + Log Types)
+
+| Infrastructure Component                | Logs Generated                             | Recommended Pipeline                                                                   | Reason                                                              |
+| --------------------------------------- | ------------------------------------------ | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| 🐳 Docker (Containers)                  | JSON stdout logs via Docker logging driver | `Filebeat → Elasticsearch`                                                             | Logs are already structured; no parsing needed                      |
+| 🌐 NGINX / Apache Web Server            | Access & error logs (plain text)           | `Filebeat → Logstash → Elasticsearch`                                                  | Needs parsing with Grok to extract IPs, URLs, methods, status codes |
+| 🖥 Linux Servers (Syslog, Auth)         | `/var/log/syslog`, `/var/log/auth.log`     | `Filebeat → Logstash → Elasticsearch`                                                  | Parsing needed + routing/filtering by log type                      |
+| ☁️ Cloud (AWS CloudTrail, Azure Logs)   | JSON logs (structured)                     | `Filebeat → Elasticsearch` or `Logstash → Elasticsearch`                               | Use Filebeat if possible; else parse raw logs via Logstash          |
+| 🐍 Node.js / Python / Java apps         | Custom logs in JSON or plain text          | If JSON: `Filebeat → Elasticsearch`<br>If plain: `Filebeat → Logstash → Elasticsearch` | Use Logstash only if app doesn't log in structured JSON             |
+| 🛠 Kubernetes (Kubelet, container logs) | Structured container logs                  | `Filebeat → Elasticsearch`                                                             | Filebeat Kubernetes module handles parsing                          |
+| 🔁 Kafka Queue (Log events)             | Streaming log events (JSON or raw)         | `Logstash → Elasticsearch`                                                             | Filebeat doesn’t ingest from Kafka directly — Logstash does         |
+| 📦 Application with compliance concerns | PII or sensitive data in logs              | `Filebeat → Logstash (masking/filtering) → Elasticsearch`                              | Mask secrets/emails/IPs in Logstash before storing                  |
+
 
 ---
 
