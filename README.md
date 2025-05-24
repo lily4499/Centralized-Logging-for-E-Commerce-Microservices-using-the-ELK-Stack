@@ -1,7 +1,7 @@
 
 # Centralized Logging for E-Commerce Microservices using the ELK Stack
 ---
-> Our e-commerce platform faced increasing complexity in monitoring distributed microservices across order, product, and frontend components. To gain full observability, we implemented a centralized logging pipeline using the ELK Stack. Logs from NGINX, product-service, and order-service were collected using Logstash and parsed using Grok and JSON decoding, then indexed into Elasticsearch. This setup enabled our team to visualize traffic trends, detect 404/500 errors, and monitor application health through Kibana dashboards. As a result, we reduced log troubleshooting time by 70% and proactively resolved performance issues before they reached users.
+> Case Study: Our e-commerce platform faced increasing complexity in monitoring distributed microservices across order, product, and frontend components. To gain full observability, we implemented a centralized logging pipeline using the ELK Stack. Logs from NGINX, product-service, and order-service were collected using Logstash and parsed using Grok and JSON decoding, then indexed into Elasticsearch. This setup enabled our team to visualize traffic trends, detect 404/500 errors, and monitor application health through Kibana dashboards. As a result, we reduced log troubleshooting time by 70% and proactively resolved performance issues before they reached users.
 
 ---
 ### 🧭 Objective:
